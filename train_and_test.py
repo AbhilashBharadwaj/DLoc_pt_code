@@ -188,7 +188,8 @@ elif opt_exp.n_decoders == 1:
 
 else:
     print('Incorrect number of Decoders specified in the parameters')
-    return -1
+    # return -1
+    exit(0)
 
 if opt_exp.isFrozen:
     enc_model.load_networks(opt_encoder.starting_epoch_count)
