@@ -6,113 +6,87 @@ For further details onto which params file to load
 read the README in `params_storage` folder.
 '''
 
-import torch
 import warnings
+
+import torch
+
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=FutureWarning)
-from utils import *
-from modelADT import ModelADT
-from Generators import *
-from data_loader import load_data
-from joint_model import Enc_2Dec_Network
-from joint_model import Enc_Dec_Network
-from params import *
 import trainer
+from data_loader import load_data
+from Generators import *
+from joint_model import Enc_2Dec_Network, Enc_Dec_Network
+from modelADT import ModelADT
+from params import *
+from utils import *
+
 torch.manual_seed(0)
 np.random.seed(0)
+import scipy.io
 
 '''
 Defining the paths from where to Load Data.
 Assumes that the data is stored in a subfolder called data in the current data folder
 '''
+BASE_PATH = "/media/datadisk_2/loc_data/wifi/quantenna/datasets_release/"
 
-#####################################Final Simple Space Results################################################
-if "data" in opt_exp and opt_exp.data == "rw_to_rw_atk":
-    # Training and testing data loaded for the Final results For Env-1 (The smaller space) in the paper (Figure 10a)
-    trainpath = ['./data/dataset_non_fov_train_July18.mat',
-                './data/dataset_fov_train_July18.mat']
-    testpath = ['./data/dataset_non_fov_test_July18.mat',
-                './data/dataset_fov_test_July18.mat']
-    print('Real World to Real World experiments started')
+def choose_dataset(opt_exp):
+    dataset_mappings = {
+        ######################################Final Simple Space Results################################################
+        "rw_to_rw_atk": {
+            "train": ["dataset_July18"],
+            "test": ["dataset_test_July18"]
+        },
+        ######################################Final Complex Space Results################################################
+        "rw_to_rw": {
+            "train": ["dataset_jacobs_July28", "dataset_jacobs_July28_2"],
+            "test": ["dataset_test_jacobs_July28", "dataset_test_jacobs_July28_2"]
+        },
+        #########################################Generalization across Scenarios###########################################
+        "rw_to_rw_env2": {
+            "train": ["dataset_jacobs_July28", "dataset_jacobs_July28_2", "dataset_jacobs_Aug16_3", "dataset_jacobs_Aug16_4_ref"],
+            "test": ["dataset_test_jacobs_Aug16_1"]
+        },
+        "rw_to_rw_env3": {
+            "train": ["dataset_jacobs_July28", "dataset_jacobs_July28_2", "dataset_jacobs_Aug16_1", "dataset_jacobs_Aug16_4_ref"],
+            "test": ["dataset_test_jacobs_Aug16_3"]
+        },
+        "rw_to_rw_env4": {
+            "train": ["dataset_jacobs_July28", "dataset_jacobs_July28_2", "dataset_jacobs_Aug16_1", "dataset_jacobs_Aug16_3"],
+            "test": ["dataset_test_jacobs_Aug16_4_ref"]
+        },
+        ######################################Generalization Across Bandwidth##########################################
+        ########## Unclear and need to be discussed ###########
+        # "rw_to_rw_40": {
+        #     "train": ["dataset_jacobs_July28_40"], 
+        #     "test": ["dataset_test_jacobs_July28_40"]  
+        # },
+        # "rw_to_rw_20": {
+        #     "train": ["dataset_jacobs_July28_20"],  
+        #     "test": ["dataset_test_jacobs_July28_20"]   
+        # },
+        ######################################Generalization Across Space##########################################
+        "data_segment": {
+            "train": ["dataset_jacobs_July28", "dataset_jacobs_July28_2"],
+            "test": ["dataset_test_jacobs_July28", "dataset_test_jacobs_July28_2"]
+        },
+    
+    }
 
-#####################################Final Complex Space Results################################################
-elif "data" in opt_exp and opt_exp.data == "rw_to_rw":
-    # Training and testing data loaded for the Final results For Env-2 (The larger space) in the paper (Figure 10b)
-    trainpath = ['./data/dataset_jacobs_July28.mat',
-                './data/dataset_non_fov_train_jacobs_July28_2.mat',
-                './data/dataset_fov_train_jacobs_July28_2.mat']
-    testpath = ['./data/dataset_fov_test_jacobs_July28_2.mat',
-                './data/dataset_non_fov_test_jacobs_July28_2.mat']
-    print('Real World to Real World experiments started')
+    if opt_exp.data in dataset_mappings:
+        dataset_info = dataset_mappings[opt_exp.data]
+        train_paths = [BASE_PATH + name + '.mat' for name in dataset_info["train"]]
+        test_paths = [BASE_PATH + name + '.mat' for name in dataset_info["test"]]
 
-#########################################Generalization across Scenarios###########################################
-
-elif "data" in opt_exp and opt_exp.data == "rw_to_rw_env2":
-    # Training and testing data loaded for the Final results For Env-2
-    # for Generalization across scenarios (Table-1) train on 1/3/4 and test on 2
-    trainpath = ['./data/dataset_jacobs_July28.mat',
-                './data/dataset_non_fov_train_jacobs_July28_2.mat',
-                './data/dataset_fov_train_jacobs_July28_2.mat',
-                './data/dataset_train_jacobs_Aug16_3.mat',
-                './data/dataset_train_jacobs_Aug16_4_ref.mat']
-    testpath = ['./data/dataset_train_jacobs_Aug16_1.mat']
-    print('Real World to Real World experiments started')
+        return train_paths, test_paths
+    else:
+        raise ValueError("Invalid experiment option provided")
 
 
-elif "data" in opt_exp and opt_exp.data == "rw_to_rw_env3":
-    # Training and testing data loaded for the Final results For Env-2
-    # for Generalization across scenarios (Table-1) train on 1/2/4 and test on 3
-    trainpath = ['./data/dataset_jacobs_July28.mat',
-                './data/dataset_non_fov_train_jacobs_July28_2.mat',
-                './data/dataset_fov_train_jacobs_July28_2.mat',
-                './data/dataset_train_jacobs_Aug16_1.mat',
-                './data/dataset_train_jacobs_Aug16_4_ref.mat']
-    testpath = ['./data/dataset_train_jacobs_Aug16_3.mat']
-    print('Real World to Real World experiments started')
+if "data" in opt_exp:
+    trainpath, testpath = choose_dataset(opt_exp)
+    print(f'Experiment {opt_exp.data} started')
 
-elif "data" in opt_exp and opt_exp.data == "rw_to_rw_env4":
-    # Training and testing data loaded for the Final results For Env-2
-    # for Generalization across scenarios (Table-1) train on 1/2/3 and test on 4
-    trainpath = ['./data/dataset_jacobs_July28.mat',
-                './data/dataset_non_fov_train_jacobs_July28_2.mat',
-                './data/dataset_fov_train_jacobs_July28_2.mat',
-                './data/dataset_train_jacobs_Aug16_1.mat',
-                './data/dataset_train_jacobs_Aug16_3.mat']
-    testpath = ['./data/dataset_train_jacobs_Aug16_4_ref.mat']
-    print('Real World to Real World experiments started')
-
-######################################Generalization Across Bandwidth##########################################
-
-elif "data" in opt_exp and opt_exp.data == "rw_to_rw_40":
-    # Training and testing data loaded for the Generalization results For Env-2 (The larger space) in the paper (Figure 13a) at 40MHz
-    trainpath = ['./data/dataset40_jacobs_July28.mat',
-                './data/dataset40_non_fov_train_jacobs_July28_2.mat',
-                './data/dataset40_fov_train_jacobs_July28_2.mat']
-    testpath = ['./data/dataset40_fov_test_jacobs_July28_2.mat',
-                './data/dataset40_non_fov_test_jacobs_July28_2.mat']
-    print('Real World to Real World experiments started')
-
-elif "data" in opt_exp and opt_exp.data == "rw_to_rw_20":
-    # Training and testing data loaded for the Generalization results For Env-2 (The larger space) in the paper (Figure 13a) at 20MHz
-    trainpath = ['./data/dataset20_jacobs_July28.mat',
-                './data/dataset20_non_fov_train_jacobs_July28_2.mat',
-                './data/dataset20_fov_train_jacobs_July28_2.mat']
-    testpath = ['./data/dataset20_fov_test_jacobs_July28_2.mat',
-                './data/dataset20_non_fov_test_jacobs_July28_2.mat']
-    print('Real World to Real World experiments started')
-
-######################################Generalization Across Space##########################################
-
-elif "data" in opt_exp and opt_exp.data == "data_segment":
-    # Training and testing data loaded for the Final results For Env-2 
-    # for Disjoint Training and Testing(The larger space) in the paper (Figure 13b)
-    trainpath = ['./data/dataset_train_jacobs_July28.mat',
-                './data/dataset_train_jacobs_July28_2.mat']
-    testpath = ['./data/dataset_test_jacobs_July28.mat',
-                './data/dataset_test_jacobs_July28_2.mat']
-    print('non-FOV to non-FOV experiments started')
-
-######################################################################################################################
 '''
 Loading Training and Evaluation Data into their respective Dataloaders
 '''
